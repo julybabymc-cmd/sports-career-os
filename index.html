@@ -505,7 +505,7 @@
 <div id="sidebar">
   <div class="brandbox"><span class="brandmark" id="sideMark"></span><span class="wordmark wm-side"><span class="l1">I’m going to succeed</span><span class="l2">because I am crazy</span></span></div>
   <div class="brand-sub">by Mags</div>
-  <div class="brand-sub" style="margin-top:-10px;opacity:.6;">versão: 2026-10-12</div>
+  <div class="brand-sub" style="margin-top:-10px;opacity:.6;">versão: 2026-10-12b</div>
 
   <div id="navList"></div>
   <div class="syncrow" id="syncRow" style="display:none;">
@@ -1673,7 +1673,7 @@ function authErrorMessage(err){
   if(/invalid login credentials/i.test(m)) return "Email ou password errados. Se não te lembras da password, carrega em \"Esqueci-me da password\". Confirma também se a conta foi criada com este email (pode ter sido com outro).";
   if(/email not confirmed/i.test(m)) return "Este email ainda não foi confirmado. Abre o email de confirmação que recebeste (vê também o spam) ou carrega em \"Reenviar email de confirmação\".";
   if(/rate limit|too many|security purposes/i.test(m)) return "Demasiadas tentativas seguidas. Espera uns minutos e tenta outra vez.";
-  if(/failed to fetch|network|load failed/i.test(m)) return "Sem ligação ao servidor. Verifica a internet (ou se alguma extensão está a bloquear o supabase.co) e tenta outra vez.";
+  if(/failed to fetch|network|load failed/i.test(m)) return "Não consigo chegar ao servidor da tua conta (Supabase). O mais provável é o projeto estar em pausa por inatividade: entra em supabase.com, abre o projeto e carrega em \"Restore project\". Se não for isso, verifica a internet ou se alguma extensão está a bloquear o supabase.co.";
   return "Não foi possível entrar: " + m;
 }
 function authSetMsg(el, text, ok){
@@ -1694,7 +1694,8 @@ async function handleForgotPassword(){
     if(error) throw error;
     authSetMsg(errEl, "Se existir uma conta com " + email + ", vais receber um email com um link para escolheres uma nova password (vê também o spam). Abre o link neste mesmo computador.", true);
   }catch(err){
-    authSetMsg(errEl, /rate limit|security purposes/i.test(err.message||"") ? "Já foi pedido um email há pouco. Espera uns minutos antes de pedir outro." : "Não foi possível enviar o email: " + (err.message||err));
+    const m = err.message||String(err);
+    authSetMsg(errEl, /rate limit|security purposes/i.test(m) ? "Já foi pedido um email há pouco. Espera uns minutos antes de pedir outro." : /failed to fetch|network|load failed/i.test(m) ? authErrorMessage(err) : "Não foi possível enviar o email: " + m);
   }
 }
 async function handleResendConfirm(){
@@ -1709,7 +1710,7 @@ async function handleResendConfirm(){
     authSetMsg(errEl, "Email de confirmação reenviado para " + email + " (vê também o spam). Depois de confirmares, volta aqui e entra com a tua password.", true);
   }catch(err){
     const m = err.message||String(err);
-    authSetMsg(errEl, /rate limit|security purposes/i.test(m) ? "Já foi pedido um email há pouco. Espera uns minutos antes de pedir outro." : "Não foi possível reenviar: " + m);
+    authSetMsg(errEl, /rate limit|security purposes/i.test(m) ? "Já foi pedido um email há pouco. Espera uns minutos antes de pedir outro." : /failed to fetch|network|load failed/i.test(m) ? authErrorMessage(err) : "Não foi possível reenviar: " + m);
   }
 }
 function showRecoveryCard(){
