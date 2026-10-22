@@ -358,6 +358,8 @@
   .authcard button{width:100%;padding:11px 12px;border:none;border-radius:10px;background:var(--accent);color:#fff;font-weight:700;font-size:14px;cursor:pointer;margin-top:4px;}
   .authcard button:disabled{opacity:.6;}
   .authcard .autherr{color:var(--bad);font-size:12px;margin-top:8px;min-height:14px;line-height:1.45;}
+  .authcard .authremember{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text);margin:2px 0 12px;cursor:pointer;user-select:none;}
+  .authcard .authremember input{width:16px;height:16px;margin:0;padding:0;accent-color:var(--accent);flex:0 0 auto;cursor:pointer;}
   .authcard .authlinks{display:flex;flex-wrap:wrap;justify-content:center;gap:4px 14px;margin-top:12px;}
   .authcard .authlinks a{font-size:12px;color:var(--accent2);text-decoration:none;cursor:pointer;}
   .authcard .authlinks a:hover{text-decoration:underline;}
@@ -493,6 +495,7 @@
     <p>Os teus dados ficam guardados na cloud e sincronizados entre dispositivos. Entra com o teu email e password — se ainda não tens conta, cria uma abaixo.</p>
     <input type="email" id="authEmail" placeholder="Email" autocomplete="username">
     <input type="password" id="authPassword" placeholder="Password" autocomplete="current-password">
+    <label class="authremember"><input type="checkbox" id="authRemember" checked> Manter sessão iniciada</label>
     <button id="authSubmitBtn" onclick="handleAuthSubmit()">Entrar</button>
     <button id="authSignUpBtn" onclick="handleAuthSignUp()" style="background:var(--panel2);color:var(--text);border:1px solid var(--border);">Criar conta</button>
     <div class="autherr" id="authError"></div>
@@ -514,7 +517,7 @@
 <div id="sidebar">
   <div class="brandbox"><span class="brandmark" id="sideMark"></span><span class="wordmark wm-side"><span class="l1">I’m going to succeed</span><span class="l2">because I am crazy</span></span></div>
   <div class="brand-sub">by Mags</div>
-  <div class="brand-sub" style="margin-top:-10px;opacity:.6;">versão: 2026-10-22b</div>
+  <div class="brand-sub" style="margin-top:-10px;opacity:.6;">versão: 2026-10-22c</div>
 
   <div id="navList"></div>
   <div class="syncrow" id="syncRow" style="display:none;">
@@ -1577,7 +1580,17 @@ let DB = {"quotes":[{"text":"I am going to succeed because I am crazy.","author"
 const SUPABASE_URL = "https://hqnvhmifwemlibuqzyfu.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhxbnZobWlmd2VtbGlidXF6eWZ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYzODQyNzMsImV4cCI6MjEwMTk2MDI3M30.B3GbDW2E0Kj887I4z9P24A9Hv0ffmCO2np9waN5LQCk";
 const CLOUD_SYNC_ENABLED = /^https:\/\/.+\.supabase\.co\/?$/.test(SUPABASE_URL) && SUPABASE_ANON_KEY.length > 20;
-let sb = (CLOUD_SYNC_ENABLED && typeof supabase !== "undefined") ? supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
+// "Manter sessão iniciada": com a opção ligada a sessão fica guardada neste dispositivo (localStorage);
+// desligada, fica só até fechares o browser (sessionStorage).
+const AUTH_REMEMBER_KEY = "driven_remember_session";
+function authRemember(){ try{ return localStorage.getItem(AUTH_REMEMBER_KEY) !== "0"; }catch(e){ return true; } }
+function setAuthRemember(on){ try{ localStorage.setItem(AUTH_REMEMBER_KEY, on ? "1" : "0"); }catch(e){} }
+const authStorage = {
+  getItem(k){ try{ return authRemember() ? localStorage.getItem(k) : sessionStorage.getItem(k); }catch(e){ return null; } },
+  setItem(k,v){ try{ if(authRemember()){ localStorage.setItem(k,v); sessionStorage.removeItem(k); } else { sessionStorage.setItem(k,v); localStorage.removeItem(k); } }catch(e){} },
+  removeItem(k){ try{ localStorage.removeItem(k); }catch(e){} try{ sessionStorage.removeItem(k); }catch(e){} }
+};
+let sb = (CLOUD_SYNC_ENABLED && typeof supabase !== "undefined") ? supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth:{ persistSession:true, autoRefreshToken:true, detectSessionInUrl:true, storage: authStorage } }) : null;
 // Detetar se a página abriu a partir do link de "repor password" (antes de o Supabase limpar o URL)
 const AUTH_URL_HASH = location.hash || "";
 const AUTH_RECOVERY_IN_URL = /type=recovery/.test(AUTH_URL_HASH);
@@ -1752,6 +1765,7 @@ async function handleSaveNewPassword(){
 }
 
 async function handleAuthSubmit(){
+  { const rb = document.getElementById("authRemember"); if(rb) setAuthRemember(rb.checked); }
   const email = document.getElementById("authEmail").value.trim();
   const password = document.getElementById("authPassword").value;
   const errEl = document.getElementById("authError");
@@ -1774,6 +1788,7 @@ async function handleAuthSubmit(){
 }
 
 async function handleAuthSignUp(){
+  { const rb = document.getElementById("authRemember"); if(rb) setAuthRemember(rb.checked); }
   const email = document.getElementById("authEmail").value.trim();
   const password = document.getElementById("authPassword").value;
   const errEl = document.getElementById("authError");
@@ -1813,6 +1828,7 @@ async function initCloudSync(){
     startApp();
     return;
   }
+  { const rb = document.getElementById("authRemember"); if(rb) rb.checked = authRemember(); }
   const authBrand = document.getElementById("authBrandMark");
   if(authBrand) authBrand.innerHTML = brandMark();
   try{
@@ -1869,6 +1885,7 @@ function renderConta(){
         : '<p style="font-size:13px;color:var(--muted);margin-bottom:8px;">Ainda não tens sessão iniciada — o que editares só fica guardado nesta aba até fazeres login.</p>')+
       '<input type="email" id="acctEmail" placeholder="Email" style="margin-bottom:8px;">'+
       '<input type="password" id="acctPassword" placeholder="Password (mín. 6 caracteres)" style="margin-bottom:10px;">'+
+      '<label style="display:flex;align-items:center;gap:8px;font-size:13px;margin:0 0 10px;cursor:pointer;"><input type="checkbox" id="acctRemember" '+(authRemember()?'checked':'')+' style="width:16px;height:16px;margin:0;accent-color:var(--accent);"> Manter sessão iniciada</label>'+
       '<div style="display:flex;gap:8px;flex-wrap:wrap;">'+
         '<button class="btn primary" id="acctSignInBtn" onclick="acctSignIn()">Entrar</button>'+
         '<button class="btn" id="acctSignUpBtn" onclick="acctSignUp()">Criar conta</button>'+
@@ -1877,6 +1894,7 @@ function renderConta(){
   }
 }
 async function acctSignIn(){
+  { const rb = document.getElementById("acctRemember"); if(rb) setAuthRemember(rb.checked); }
   const email = document.getElementById("acctEmail").value.trim();
   const password = document.getElementById("acctPassword").value;
   const errEl = document.getElementById("acctError");
@@ -1899,6 +1917,7 @@ async function acctSignIn(){
   }
 }
 async function acctSignUp(){
+  { const rb = document.getElementById("acctRemember"); if(rb) setAuthRemember(rb.checked); }
   const email = document.getElementById("acctEmail").value.trim();
   const password = document.getElementById("acctPassword").value;
   const errEl = document.getElementById("acctError");
